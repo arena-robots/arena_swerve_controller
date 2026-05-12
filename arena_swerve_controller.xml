@@ -1,0 +1,11 @@
+<library path="arena_swerve_controller">
+  <class name="arena_swerve_controller/SwerveController"
+         type="arena_swerve_controller::SwerveController"
+         base_class_type="controller_interface::ControllerInterface">
+    <description>
+      4-wheel independent steering (swerve) controller. Consumes a Twist
+      reference and emits per-wheel velocity and per-steering position
+      commands; publishes nav_msgs/Odometry from measured state.
+    </description>
+  </class>
+</library>

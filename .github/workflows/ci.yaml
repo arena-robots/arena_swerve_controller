@@ -1,0 +1,29 @@
+name: CI
+
+on:
+  push:
+    branches: ["**"]
+  pull_request:
+    branches: ["**"]
+
+jobs:
+  build-and-test:
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: ros-tooling/setup-ros@v0.7
+        with:
+          required-ros-distributions: jazzy
+
+      - uses: ros-tooling/action-ros-ci@v0.3
+        id: ros-ci
+        with:
+          target-ros2-distro: jazzy
+          package-name: arena_swerve_controller
+
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: colcon-logs
+          path: ${{ steps.ros-ci.outputs.ros-workspace-directory }}/log

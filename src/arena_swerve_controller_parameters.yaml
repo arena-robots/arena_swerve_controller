@@ -1,0 +1,88 @@
+arena_swerve_controller:
+  wheel_joint_names:
+    type: string_array
+    description: "Traction joints, one per wheel, in the same order as wheel_positions_x / wheel_positions_y."
+    validation:
+      fixed_size<>: 4
+      unique<>: null
+
+  steering_joint_names:
+    type: string_array
+    description: "Steering joints, one per wheel, in the same order as wheel_positions_x / wheel_positions_y."
+    validation:
+      fixed_size<>: 4
+      unique<>: null
+
+  wheel_radius:
+    type: double
+    description: "Wheel radius (m). Maps linear wheel speed to traction joint angular velocity."
+    validation:
+      gt<>: 0.0
+
+  wheel_positions_x:
+    type: double_array
+    description: "x coordinate of each wheel hub in base_link frame (m)."
+    validation:
+      fixed_size<>: 4
+
+  wheel_positions_y:
+    type: double_array
+    description: "y coordinate of each wheel hub in base_link frame (m)."
+    validation:
+      fixed_size<>: 4
+
+  max_steering_angle:
+    type: double
+    default_value: 1.5707963267948966
+    description: "Maximum |steering angle| (rad). Targets are clamped to this range."
+    validation:
+      gt<>: 0.0
+
+  allow_reverse_drive:
+    type: bool
+    default_value: true
+    description: "If true, when a new heading would rotate a wheel by more than pi/2 AND the flipped (target+pi) heading stays within max_steering_angle, flip the wheel direction and shift the steering target by pi."
+
+  cmd_vel_timeout:
+    type: double
+    default_value: 0.5
+    description: "Seconds. If no reference arrives within this window, commanded twist is zeroed."
+    validation:
+      gt<>: 0.0
+
+  use_stamped_vel:
+    type: bool
+    default_value: false
+    description: "Controls the message type on ~/cmd_vel. true -> TwistStamped (use with an upstream twist_stamper); false -> Twist, stamped internally with the controller node clock."
+
+  publish_odom:
+    type: bool
+    default_value: true
+    description: "Publish nav_msgs/Odometry on ~/odometry."
+
+  publish_tf:
+    type: bool
+    default_value: false
+    description: "Publish odom -> base TF on /tf. Off by default since most Arena robots get TF via a separate pose_to_tf bridge."
+
+  odom_frame_id:
+    type: string
+    default_value: "odom"
+
+  base_frame_id:
+    type: string
+    default_value: "base_link"
+
+  pose_covariance_diagonal:
+    type: double_array
+    default_value: [0.001, 0.001, 1.0e+9, 1.0e+9, 1.0e+9, 0.01]
+    description: "Diagonal of the 6x6 pose covariance for ~/odometry, order [x, y, z, roll, pitch, yaw]. Large default for z/roll/pitch since those are not estimated."
+    validation:
+      fixed_size<>: 6
+
+  twist_covariance_diagonal:
+    type: double_array
+    default_value: [0.001, 0.001, 1.0e+9, 1.0e+9, 1.0e+9, 0.01]
+    description: "Diagonal of the 6x6 twist covariance for ~/odometry, order [vx, vy, vz, wx, wy, wz]. Large default for vz/wx/wy since those are not estimated."
+    validation:
+      fixed_size<>: 6
