@@ -177,6 +177,7 @@ SwerveController::on_activate(const rclcpp_lifecycle::State &)
   zero->header.stamp = get_node()->now();
   cmd_vel_buffer_.writeFromNonRT(zero);
 
+  reversed_.assign(WHEEL_COUNT, false);
   odom_x_ = 0.0;
   odom_y_ = 0.0;
   odom_yaw_ = 0.0;
@@ -207,37 +208,51 @@ SwerveController::update(const rclcpp::Time & time, const rclcpp::Duration & per
     }
   }
 
-  // Forward kinematics: per-wheel velocity vector at hub position r_i, then split into
-  // steering heading + traction speed. If reverse drive is allowed and the new heading is
-  // more than pi/2 from the current one, flip wheel direction and rotate target by pi.
+  // Forward kinematics: per-wheel velocity vector at hub position r_i, split into steering
+  // heading and traction speed. Sticky reversed sense with flip_hysteresis, traction scaled
+  // by cos(steering error) and cut beyond traction_gate_angle.
   for (std::size_t i = 0; i < WHEEL_COUNT; ++i) {
     const double x = params_.wheel_positions_x[i];
     const double y = params_.wheel_positions_y[i];
     const double vx_i = vx - wz * y;
     const double vy_i = vy + wz * x;
 
-    double speed = std::hypot(vx_i, vy_i);
+    const double speed = std::hypot(vx_i, vy_i);
     const double current_steer =
       state_interfaces_[steering_state_idx_[i]].get_optional().value_or(0.0);
-    double target_steer = (speed < 1e-6) ? current_steer : std::atan2(vy_i, vx_i);
-
-    if (params_.allow_reverse_drive && speed >= 1e-6) {
-      const double delta = wrap_to_pi(target_steer - current_steer);
-      if (std::abs(delta) > M_PI_2) {
-        // Only commit to the flip if the flipped target also stays within steering bounds,
-        // otherwise the subsequent clamp would clip it and we'd drive with a flipped speed
-        // toward a wrong heading.
-        const double flipped = wrap_to_pi(target_steer + M_PI);
-        if (std::abs(flipped) <= params_.max_steering_angle) {
-          target_steer = flipped;
-          speed = -speed;
-        }
-      }
+    if (speed < 1e-6) {
+      (void)command_interfaces_[wheel_cmd_idx_[i]].set_value(0.0);
+      (void)command_interfaces_[steering_cmd_idx_[i]].set_value(current_steer);
+      continue;
     }
 
-    target_steer = std::clamp(
-      target_steer, -params_.max_steering_angle, params_.max_steering_angle);
-    const double wheel_omega = speed / params_.wheel_radius;
+    const double forward = std::atan2(vy_i, vx_i);
+    const double flipped = wrap_to_pi(forward + M_PI);
+    const bool forward_ok = std::abs(forward) <= params_.max_steering_angle;
+    const bool flipped_ok =
+      params_.allow_reverse_drive && std::abs(flipped) <= params_.max_steering_angle;
+    const double cost_forward = std::abs(wrap_to_pi(forward - current_steer));
+    const double cost_flipped = std::abs(wrap_to_pi(flipped - current_steer));
+
+    bool reversed = reversed_[i];
+    if (!flipped_ok) {
+      reversed = false;
+    } else if (!forward_ok) {
+      reversed = true;
+    } else if (reversed) {
+      reversed = !(cost_forward + params_.flip_hysteresis < cost_flipped);
+    } else {
+      reversed = cost_flipped + params_.flip_hysteresis < cost_forward;
+    }
+    reversed_[i] = reversed;
+
+    const double target_steer = std::clamp(
+      reversed ? flipped : forward,
+      -params_.max_steering_angle, params_.max_steering_angle);
+    const double steer_error = std::abs(wrap_to_pi(target_steer - current_steer));
+    const double traction =
+      steer_error >= params_.traction_gate_angle ? 0.0 : std::cos(steer_error);
+    const double wheel_omega = (reversed ? -speed : speed) * traction / params_.wheel_radius;
 
     (void)command_interfaces_[wheel_cmd_idx_[i]].set_value(wheel_omega);
     (void)command_interfaces_[steering_cmd_idx_[i]].set_value(target_steer);

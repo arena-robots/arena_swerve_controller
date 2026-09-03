@@ -43,6 +43,20 @@ arena_swerve_controller:
     default_value: true
     description: "If true, when a new heading would rotate a wheel by more than pi/2 AND the flipped (target+pi) heading stays within max_steering_angle, flip the wheel direction and shift the steering target by pi."
 
+  flip_hysteresis:
+    type: double
+    default_value: 0.35
+    description: "Radians. A wheel keeps its current drive sense (forward or reversed) unless the other sense saves more than this much steering travel. Prevents chatter when the commanded heading sits near the pi/2 flip boundary."
+    validation:
+      gt_eq<>: 0.0
+
+  traction_gate_angle:
+    type: double
+    default_value: 1.0471975511965976
+    description: "Radians. Traction is scaled by cos(steering error) and cut entirely while the wheel is further than this from its steering target, so wheels are not driven against each other mid-steer."
+    validation:
+      gt<>: 0.0
+
   cmd_vel_timeout:
     type: double
     default_value: 0.5

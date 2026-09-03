@@ -42,6 +42,16 @@ Minimum required: `wheel_joint_names`, `steering_joint_names`, `wheel_radius`,
 | `~/odometry`  | pub | `nav_msgs/Odometry`          | `publish_odom: true`     |
 | `/tf`         | pub | `tf2_msgs/TFMessage`         | `publish_tf: true`       |
 
+## Steering behaviour
+
+Each wheel may drive reversed with its heading shifted by pi when that is the shorter
+steering move and the shifted heading stays within `max_steering_angle`. The drive sense is
+sticky: a wheel keeps it until the other sense saves more than `flip_hysteresis` (default
+0.35 rad) of travel, which stops a command near the pi/2 boundary from flipping every tick.
+Traction is scaled by the cosine of the remaining steering error and cut entirely beyond
+`traction_gate_angle` (default 60 degrees), so wheels are not driven against each other while
+they are still turning toward a new heading.
+
 ## Example: rbvogui control.yaml
 
 ```yaml

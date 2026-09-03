@@ -245,13 +245,98 @@ TEST_F(SwerveControllerTest, ReverseFlipSkippedWhenFlippedTargetOutOfRange)
   const rclcpp::Duration dt = rclcpp::Duration::from_seconds(0.02);
   EXPECT_EQ(controller_->update(t0, dt), controller_interface::return_type::OK);
 
+  // Steering still has to travel 1.0 rad, so traction is scaled by cos(1.0).
   const double expected_speed = std::hypot(-0.5, 1.0);
-  const double expected_omega = expected_speed / kWheelRadius;
+  const double expected_omega = expected_speed * std::cos(1.0) / kWheelRadius;
   for (std::size_t i = 0; i < kWheelCount; ++i) {
     EXPECT_NEAR(wheel_cmd_vals_[i], expected_omega, kTolerance)
       << "wheel[" << i << "]";
     EXPECT_NEAR(steer_cmd_vals_[i], 1.0, kTolerance)
       << "steer[" << i << "]";
+  }
+}
+
+// Pure lateral Twist (vy=0.5) with all wheels at 0: the target is pi/2, both drive senses
+// cost the same so the wheel stays forward, and traction is cut until the wheel has turned.
+// Once the steering state reaches the target the full speed is commanded.
+TEST_F(SwerveControllerTest, LateralCommandGatesTractionUntilAligned)
+{
+  ASSERT_EQ(init_controller(), controller_interface::return_type::OK);
+  configure_and_activate();
+
+  auto pub_node = rclcpp::Node::make_shared("test_publisher");
+  auto cmd_pub = pub_node->create_publisher<geometry_msgs::msg::Twist>(
+    "/test_swerve_controller/cmd_vel", rclcpp::QoS(10).reliable());
+
+  geometry_msgs::msg::Twist cmd;
+  cmd.linear.y = 0.5;
+  cmd_pub->publish(cmd);
+
+  spin_for(nullptr, std::chrono::milliseconds(200));
+
+  const rclcpp::Time t0 = controller_->get_node()->now();
+  const rclcpp::Duration dt = rclcpp::Duration::from_seconds(0.02);
+  EXPECT_EQ(controller_->update(t0, dt), controller_interface::return_type::OK);
+
+  for (std::size_t i = 0; i < kWheelCount; ++i) {
+    EXPECT_NEAR(wheel_cmd_vals_[i], 0.0, kTolerance) << "wheel[" << i << "]";
+    EXPECT_NEAR(steer_cmd_vals_[i], M_PI_2, kTolerance) << "steer[" << i << "]";
+  }
+
+  for (std::size_t i = 0; i < kWheelCount; ++i) {
+    steer_state_vals_[i] = M_PI_2;
+  }
+  EXPECT_EQ(controller_->update(t0 + dt, dt), controller_interface::return_type::OK);
+
+  const double expected_omega = 0.5 / kWheelRadius;
+  for (std::size_t i = 0; i < kWheelCount; ++i) {
+    EXPECT_NEAR(wheel_cmd_vals_[i], expected_omega, kTolerance) << "wheel[" << i << "]";
+    EXPECT_NEAR(steer_cmd_vals_[i], M_PI_2, kTolerance) << "steer[" << i << "]";
+  }
+}
+
+// Wheels sitting at 1.2 rad get a heading of -1.15 rad: reaching it forward costs 2.35 rad,
+// reversed only 0.79 rad, so the wheel reverses toward 1.99 rad. As the steering state
+// closes in on that target the reversed sense must hold, and traction ramps with cos(error).
+TEST_F(SwerveControllerTest, FlipDecisionHoldsWhileSteeringConverges)
+{
+  ASSERT_EQ(init_controller(), controller_interface::return_type::OK);
+  configure_and_activate();
+
+  auto pub_node = rclcpp::Node::make_shared("test_publisher");
+  auto cmd_pub = pub_node->create_publisher<geometry_msgs::msg::Twist>(
+    "/test_swerve_controller/cmd_vel", rclcpp::QoS(10).reliable());
+
+  geometry_msgs::msg::Twist cmd;
+  cmd.linear.x = 0.36;
+  cmd.linear.y = -0.8;
+  cmd_pub->publish(cmd);
+
+  spin_for(nullptr, std::chrono::milliseconds(200));
+
+  const double heading = std::atan2(-0.8, 0.36);
+  const double flipped = heading + M_PI;
+  const double speed = std::hypot(0.36, 0.8);
+  const rclcpp::Time t0 = controller_->get_node()->now();
+  const rclcpp::Duration dt = rclcpp::Duration::from_seconds(0.02);
+
+  const std::vector<double> states = {1.2, 1.5, 1.8, flipped};
+  for (std::size_t k = 0; k < states.size(); ++k) {
+    for (std::size_t i = 0; i < kWheelCount; ++i) {
+      steer_state_vals_[i] = states[k];
+    }
+    EXPECT_EQ(
+      controller_->update(t0 + dt * static_cast<double>(k), dt),
+      controller_interface::return_type::OK);
+    const double err = std::abs(flipped - states[k]);
+    const double expected_omega = (err >= 1.0471975511965976 ? 0.0 : -speed * std::cos(err)) /
+      kWheelRadius;
+    for (std::size_t i = 0; i < kWheelCount; ++i) {
+      EXPECT_NEAR(steer_cmd_vals_[i], flipped, kTolerance)
+        << "step " << k << " steer[" << i << "]";
+      EXPECT_NEAR(wheel_cmd_vals_[i], expected_omega, kTolerance)
+        << "step " << k << " wheel[" << i << "]";
+    }
   }
 }
 

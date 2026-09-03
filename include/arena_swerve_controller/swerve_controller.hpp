@@ -51,6 +51,7 @@ private:
   std::vector<std::size_t> steering_cmd_idx_;
   std::vector<std::size_t> wheel_state_idx_;
   std::vector<std::size_t> steering_state_idx_;
+  std::vector<bool> reversed_;
 
   realtime_tools::RealtimeBuffer<std::shared_ptr<geometry_msgs::msg::TwistStamped>> cmd_vel_buffer_;
   rclcpp::Subscription<geometry_msgs::msg::TwistStamped>::SharedPtr cmd_vel_stamped_sub_;
