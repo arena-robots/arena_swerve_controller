@@ -33,6 +33,28 @@ See [`src/arena_swerve_controller_parameters.yaml`](src/arena_swerve_controller_
 Minimum required: `wheel_joint_names`, `steering_joint_names`, `wheel_radius`,
 `wheel_positions_x`, `wheel_positions_y`.
 
+## Speed limits
+
+Each body axis (`linear.x`, `linear.y`, `angular.z`) has an optional limiter applied to the
+commanded twist before the kinematics, with the semantics of `diff_drive_controller`:
+
+| parameter (under `<axis>.`) | default | meaning |
+|---|---|---|
+| `has_velocity_limits` | `false` | clamp the command to `[min_velocity, max_velocity]` |
+| `has_acceleration_limits` | `false` | clamp the change per update against the previously applied command to `[min_acceleration, max_acceleration] * period` |
+| `min_velocity`, `max_velocity` | `.nan` | NaN `min_velocity` mirrors `-max_velocity`, NaN `max_velocity` is unbounded |
+| `min_acceleration`, `max_acceleration` | `.nan` | NaN `min_acceleration` mirrors `-max_acceleration`, NaN `max_acceleration` is unbounded |
+
+The previous limited command resets on activation. A command older than `cmd_vel_timeout`
+is zeroed without acceleration limiting.
+
+```yaml
+linear.x.has_velocity_limits: true
+linear.x.max_velocity: 0.8
+linear.x.has_acceleration_limits: true
+linear.x.max_acceleration: 1.5
+```
+
 ## Topics
 
 | topic | direction | type | when |
