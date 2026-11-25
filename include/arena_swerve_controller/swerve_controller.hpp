@@ -20,6 +20,7 @@
 #include "tf2_msgs/msg/tf_message.hpp"
 
 #include <arena_swerve_controller/arena_swerve_controller_parameters.hpp>
+#include <arena_swerve_controller/speed_limiter.hpp>
 
 namespace arena_swerve_controller
 {
@@ -61,6 +62,13 @@ private:
   std::shared_ptr<realtime_tools::RealtimePublisher<nav_msgs::msg::Odometry>> rt_odom_pub_;
   std::shared_ptr<rclcpp::Publisher<tf2_msgs::msg::TFMessage>> tf_pub_;
   std::shared_ptr<realtime_tools::RealtimePublisher<tf2_msgs::msg::TFMessage>> rt_tf_pub_;
+
+  SpeedLimiter limiter_x_;
+  SpeedLimiter limiter_y_;
+  SpeedLimiter limiter_wz_;
+  double last_vx_{0.0};
+  double last_vy_{0.0};
+  double last_wz_{0.0};
 
   double odom_x_{0.0};
   double odom_y_{0.0};

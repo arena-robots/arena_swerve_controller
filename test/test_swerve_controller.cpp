@@ -112,6 +112,17 @@ protected:
     }
   }
 
+  void publish_twist(double vx)
+  {
+    auto pub_node = rclcpp::Node::make_shared("test_publisher");
+    auto cmd_pub = pub_node->create_publisher<geometry_msgs::msg::Twist>(
+      "/test_swerve_controller/cmd_vel", rclcpp::QoS(10).reliable());
+    geometry_msgs::msg::Twist cmd;
+    cmd.linear.x = vx;
+    cmd_pub->publish(cmd);
+    spin_for(nullptr, std::chrono::milliseconds(200));
+  }
+
   void configure_and_activate()
   {
     auto node = controller_->get_node();
@@ -380,6 +391,67 @@ TEST_F(SwerveControllerTest, OdometryReportsForwardTwist)
   EXPECT_NEAR(received->twist.twist.angular.z, 0.0, kTolerance);
   EXPECT_NEAR(received->pose.pose.position.x, 0.5 * 0.02, kTolerance);
   EXPECT_NEAR(received->pose.pose.position.y, 0.0, kTolerance);
+}
+
+TEST_F(SwerveControllerTest, VelocityLimitClampsForwardCommand)
+{
+  ASSERT_EQ(
+    init_controller(
+      {rclcpp::Parameter("linear.x.has_velocity_limits", true),
+        rclcpp::Parameter("linear.x.max_velocity", 0.2)}),
+    controller_interface::return_type::OK);
+  configure_and_activate();
+
+  publish_twist(0.5);
+  const rclcpp::Time t0 = controller_->get_node()->now();
+  const rclcpp::Duration dt = rclcpp::Duration::from_seconds(0.02);
+  EXPECT_EQ(controller_->update(t0, dt), controller_interface::return_type::OK);
+  for (std::size_t i = 0; i < kWheelCount; ++i) {
+    EXPECT_NEAR(wheel_cmd_vals_[i], 0.2 / kWheelRadius, kTolerance) << "wheel[" << i << "]";
+  }
+
+  publish_twist(-0.5);
+  EXPECT_EQ(controller_->update(t0 + dt, dt), controller_interface::return_type::OK);
+  for (std::size_t i = 0; i < kWheelCount; ++i) {
+    EXPECT_NEAR(wheel_cmd_vals_[i], -0.2 / kWheelRadius, kTolerance) << "wheel[" << i << "]";
+  }
+}
+
+TEST_F(SwerveControllerTest, AccelerationLimitRampsForwardCommand)
+{
+  ASSERT_EQ(
+    init_controller(
+      {rclcpp::Parameter("linear.x.has_acceleration_limits", true),
+        rclcpp::Parameter("linear.x.max_acceleration", 1.0)}),
+    controller_interface::return_type::OK);
+  configure_and_activate();
+
+  publish_twist(0.5);
+  const rclcpp::Time t0 = controller_->get_node()->now();
+  const rclcpp::Duration dt = rclcpp::Duration::from_seconds(0.02);
+  for (int k = 1; k <= 3; ++k) {
+    EXPECT_EQ(
+      controller_->update(t0 + dt * static_cast<double>(k - 1), dt),
+      controller_interface::return_type::OK);
+    for (std::size_t i = 0; i < kWheelCount; ++i) {
+      EXPECT_NEAR(wheel_cmd_vals_[i], 0.02 * k / kWheelRadius, kTolerance)
+        << "step " << k << " wheel[" << i << "]";
+    }
+  }
+}
+
+TEST_F(SwerveControllerTest, DefaultsLeaveCommandUnchanged)
+{
+  ASSERT_EQ(init_controller(), controller_interface::return_type::OK);
+  configure_and_activate();
+
+  publish_twist(5.0);
+  const rclcpp::Time t0 = controller_->get_node()->now();
+  const rclcpp::Duration dt = rclcpp::Duration::from_seconds(0.02);
+  EXPECT_EQ(controller_->update(t0, dt), controller_interface::return_type::OK);
+  for (std::size_t i = 0; i < kWheelCount; ++i) {
+    EXPECT_NEAR(wheel_cmd_vals_[i], 5.0 / kWheelRadius, kTolerance) << "wheel[" << i << "]";
+  }
 }
 
 }  // namespace

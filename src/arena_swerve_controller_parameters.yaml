@@ -100,3 +100,82 @@ arena_swerve_controller:
     description: "Diagonal of the 6x6 twist covariance for ~/odometry, order [vx, vy, vz, wx, wy, wz]. Large default for vz/wx/wy since those are not estimated."
     validation:
       fixed_size<>: 6
+
+  linear:
+    x:
+      has_velocity_limits:
+        type: bool
+        default_value: false
+        description: "Clamp the commanded linear.x velocity to [min_velocity, max_velocity]."
+      has_acceleration_limits:
+        type: bool
+        default_value: false
+        description: "Clamp the per-update change of the commanded linear.x velocity to [min_acceleration, max_acceleration] times the update period."
+      min_velocity:
+        type: double
+        default_value: .nan
+        description: "Lower velocity bound (m/s). NaN mirrors -max_velocity."
+      max_velocity:
+        type: double
+        default_value: .nan
+        description: "Upper velocity bound (m/s). NaN leaves the upper side unbounded."
+      min_acceleration:
+        type: double
+        default_value: .nan
+        description: "Lower acceleration bound (m/s^2, negative means deceleration). NaN mirrors -max_acceleration."
+      max_acceleration:
+        type: double
+        default_value: .nan
+        description: "Upper acceleration bound (m/s^2). NaN leaves the upper side unbounded."
+    y:
+      has_velocity_limits:
+        type: bool
+        default_value: false
+        description: "Clamp the commanded linear.y velocity to [min_velocity, max_velocity]."
+      has_acceleration_limits:
+        type: bool
+        default_value: false
+        description: "Clamp the per-update change of the commanded linear.y velocity to [min_acceleration, max_acceleration] times the update period."
+      min_velocity:
+        type: double
+        default_value: .nan
+        description: "Lower velocity bound (m/s). NaN mirrors -max_velocity."
+      max_velocity:
+        type: double
+        default_value: .nan
+        description: "Upper velocity bound (m/s). NaN leaves the upper side unbounded."
+      min_acceleration:
+        type: double
+        default_value: .nan
+        description: "Lower acceleration bound (m/s^2, negative means deceleration). NaN mirrors -max_acceleration."
+      max_acceleration:
+        type: double
+        default_value: .nan
+        description: "Upper acceleration bound (m/s^2). NaN leaves the upper side unbounded."
+
+  angular:
+    z:
+      has_velocity_limits:
+        type: bool
+        default_value: false
+        description: "Clamp the commanded angular.z velocity to [min_velocity, max_velocity]."
+      has_acceleration_limits:
+        type: bool
+        default_value: false
+        description: "Clamp the per-update change of the commanded angular.z velocity to [min_acceleration, max_acceleration] times the update period."
+      min_velocity:
+        type: double
+        default_value: .nan
+        description: "Lower velocity bound (rad/s). NaN mirrors -max_velocity."
+      max_velocity:
+        type: double
+        default_value: .nan
+        description: "Upper velocity bound (rad/s). NaN leaves the upper side unbounded."
+      min_acceleration:
+        type: double
+        default_value: .nan
+        description: "Lower acceleration bound (rad/s^2, negative means deceleration). NaN mirrors -max_acceleration."
+      max_acceleration:
+        type: double
+        default_value: .nan
+        description: "Upper acceleration bound (rad/s^2). NaN leaves the upper side unbounded."
